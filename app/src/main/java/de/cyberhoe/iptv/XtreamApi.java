@@ -58,11 +58,16 @@ final class XtreamApi {
                 try{return new XtreamApi(all,result.get(),user,pass);}catch(Exception e){last=e;}
             }
         }finally{pool.shutdownNow();}
-        throw new IllegalStateException(last==null?"Kein Server antwortet":useful(last));
+        throw new IllegalStateException("Keiner der hinterlegten Server akzeptiert den Zugang. Bitte die aktuelle Xtream-Server-URL vom Anbieter eintragen.");
     }
     private static void authenticateAt(String server,String user,String pass) throws Exception {
         String target=normalize(server)+"/player_api.php?username="+encode(user)+"&password="+encode(pass);
-        JSONObject root=new JSONObject(getUrl(target,3500,6500));
+        String body=getUrl(target,3500,6500).trim();
+        if(!body.startsWith("{")){
+            if(body.startsWith("<")||body.toLowerCase().contains("<html"))throw new IllegalArgumentException("Server liefert nur eine Webseite statt der IPTV-API");
+            throw new IllegalArgumentException("Server liefert keine gültige IPTV-API");
+        }
+        JSONObject root=new JSONObject(body);
         JSONObject info=root.optJSONObject("user_info");
         if(info==null||!"Active".equalsIgnoreCase(info.optString("status")))throw new IllegalArgumentException("Zugang nicht aktiv");
     }
