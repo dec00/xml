@@ -11,6 +11,7 @@ import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -21,7 +22,7 @@ import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends AppCompatActivity {
     private static final String[] SERVERS = {
-        "Server auswählen …",
+        "Automatisch – schnellster Server",
         "http://cf.business-cdn.me",
         "http://cf.hi-ott.me",
         "http://cf.hi-cdn.me",
@@ -61,12 +62,20 @@ public class MainActivity extends AppCompatActivity {
         serverChoice.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){if(pos>0&&pos<SERVERS.length-1)server.setText(SERVERS[pos]);}});
         root.addView(serverChoice,new LinearLayout.LayoutParams(-1,-2)); root.addView(server,new LinearLayout.LayoutParams(-1,-2)); root.addView(user,new LinearLayout.LayoutParams(-1,-2)); root.addView(pass,new LinearLayout.LayoutParams(-1,-2));
         Button login=button("ANMELDEN"); root.addView(login,new LinearLayout.LayoutParams(-1,-2)); TextView status=title("",16); root.addView(status);
-        login.setOnClickListener(v->{ String s=server.getText().toString().trim(),u=user.getText().toString().trim(),p=pass.getText().toString(); if(s.isEmpty()||u.isEmpty()||p.isEmpty()){status.setText("Bitte alle Felder ausfüllen.");return;} status.setText("Verbindung wird geprüft …"); api=new XtreamApi(s,u,p); io.execute(()->{try{api.authenticate();prefs.edit().putString("server",s).putString("user",u).putString("pass",p).apply();runOnUiThread(this::showHome);}catch(Exception e){runOnUiThread(()->status.setText("Anmeldung fehlgeschlagen: "+e.getMessage()));}}); });
+        login.setOnClickListener(v->{ String s=server.getText().toString().trim(),u=user.getText().toString().trim(),p=pass.getText().toString(); if(s.isEmpty()||u.isEmpty()||p.isEmpty()){status.setText("Bitte alle Felder ausfüllen.");return;} status.setText("Schnellster verfügbarer Server wird gesucht …"); login.setEnabled(false); io.execute(()->{try{api=XtreamApi.connectFast(serverCandidates(s),prefs.getString("working_server",s),u,p);prefs.edit().putString("server",s).putString("working_server",api.currentServer()).putString("user",u).putString("pass",p).apply();runOnUiThread(this::showHome);}catch(Exception e){runOnUiThread(()->{login.setEnabled(true);status.setText("Anmeldung fehlgeschlagen: "+e.getMessage());});}}); });
         setContentView(root);
         if(!user.getText().toString().isEmpty()&&!pass.getText().toString().isEmpty()) login.post(login::performClick);
     }
+    private List<String> serverCandidates(String selected){
+        LinkedHashSet<String> out=new LinkedHashSet<>();
+        if(selected!=null&&!selected.trim().isEmpty())out.add(selected.trim());
+        String saved=prefs.getString("working_server",""); if(!saved.isEmpty())out.add(saved);
+        String[] config=privateConfig(); if(!config[0].isEmpty())out.add(config[0]);
+        for(int i=1;i<SERVERS.length-1;i++)out.add(SERVERS[i]);
+        return new ArrayList<>(out);
+    }
     private void showHome(){
-        String s=prefs.getString("server",""); api=new XtreamApi(s,prefs.getString("user",""),prefs.getString("pass",""));
+        String s=prefs.getString("server",""); api=new XtreamApi(serverCandidates(s),prefs.getString("working_server",s),prefs.getString("user",""),prefs.getString("pass",""));
         LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(Color.rgb(9,10,16));
         LinearLayout nav=new LinearLayout(this); String[] labels={"LIVE-TV","FILME","SERIEN","FAVORITEN","ABMELDEN"};
         for(String label:labels){Button b=button(label);nav.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->{if(label.equals("ABMELDEN")){prefs.edit().clear().apply();showLogin();}else load(label);});}
@@ -79,10 +88,10 @@ public class MainActivity extends AppCompatActivity {
         list.setOnItemLongClickListener((p,v,pos,id)->{toggleFavorite(adapter.getItem(pos));return true;}); load("LIVE-TV");
     }
     private void load(String label){ section=label.equals("FILME")?"movie":label.equals("SERIEN")?"series":label.equals("FAVORITEN")?"favorites":"live"; adapter.clear(); adapter.add(new XtreamApi.Item("","Wird geladen …","","",""));
-        io.execute(()->{try{List<XtreamApi.Item> got=section.equals("movie")?api.movies():section.equals("series")?api.series():api.live();items=got;if(section.equals("favorites")){Set<String> fav=prefs.getStringSet("favorites",new HashSet<>());List<XtreamApi.Item> f=new ArrayList<>();for(XtreamApi.Item i:got)if(fav.contains(i.id))f.add(i);items=f;}runOnUiThread(()->filter(search.getText().toString()));}catch(Exception e){runOnUiThread(()->{adapter.clear();adapter.add(new XtreamApi.Item("","Fehler: "+e.getMessage(),"","",""));});}});
+        io.execute(()->{try{List<XtreamApi.Item> got=section.equals("movie")?api.movies():section.equals("series")?api.series():api.live();items=got;prefs.edit().putString("working_server",api.currentServer()).apply();if(section.equals("favorites")){Set<String> fav=prefs.getStringSet("favorites",new HashSet<>());List<XtreamApi.Item> f=new ArrayList<>();for(XtreamApi.Item i:got)if(fav.contains(i.id))f.add(i);items=f;}runOnUiThread(()->filter(search.getText().toString()));}catch(Exception e){runOnUiThread(()->{adapter.clear();adapter.add(new XtreamApi.Item("","Fehler: "+e.getMessage(),"","",""));});}});
     }
     private void filter(String q){adapter.clear();String n=q.toLowerCase();for(XtreamApi.Item i:items)if(i.name.toLowerCase().contains(n))adapter.add(i);}
-    private void open(XtreamApi.Item i){ if(i==null||i.id.isEmpty())return; if(section.equals("series")){Toast.makeText(this,"Serienepisoden folgen in Version 0.2",Toast.LENGTH_LONG).show();return;} Intent x=new Intent(this,PlayerActivity.class);x.putExtra("url",section.equals("movie")?api.movieUrl(i):api.liveUrl(i));x.putExtra("title",i.name);startActivity(x);}
+    private void open(XtreamApi.Item i){ if(i==null||i.id.isEmpty())return; if(section.equals("series")){Toast.makeText(this,"Serienepisoden folgen in Version 0.2",Toast.LENGTH_LONG).show();return;} boolean live=section.equals("live")||section.equals("favorites"); Intent x=new Intent(this,PlayerActivity.class);x.putStringArrayListExtra("urls",new ArrayList<>(live?api.liveUrls(i):api.movieUrls(i)));x.putExtra("is_live",live);x.putExtra("title",i.name);startActivity(x);}
     private void toggleFavorite(XtreamApi.Item i){Set<String> f=new HashSet<>(prefs.getStringSet("favorites",new HashSet<>()));boolean added=f.add(i.id);if(!added)f.remove(i.id);prefs.edit().putStringSet("favorites",f).apply();Toast.makeText(this,added?"Zu Favoriten hinzugefügt":"Aus Favoriten entfernt",Toast.LENGTH_SHORT).show();}
     @Override protected void onDestroy(){io.shutdownNow();super.onDestroy();}
 }
