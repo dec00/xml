@@ -68,11 +68,17 @@ public class MainActivity extends AppCompatActivity {
     }
     private List<String> serverCandidates(String selected){
         LinkedHashSet<String> out=new LinkedHashSet<>();
-        if(selected!=null&&!selected.trim().isEmpty())out.add(selected.trim());
-        String saved=prefs.getString("working_server",""); if(!saved.isEmpty())out.add(saved);
-        String[] config=privateConfig(); if(!config[0].isEmpty())out.add(config[0]);
-        for(int i=1;i<SERVERS.length-1;i++)out.add(SERVERS[i]);
+        addServerVariants(out,selected);
+        addServerVariants(out,prefs.getString("working_server",""));
+        String[] config=privateConfig(); addServerVariants(out,config[0]);
+        for(int i=1;i<SERVERS.length-1;i++)addServerVariants(out,SERVERS[i]);
         return new ArrayList<>(out);
+    }
+    private void addServerVariants(Set<String> out,String value){
+        if(value==null||value.trim().isEmpty())return;
+        String clean=value.trim().replaceAll("/+$",""); out.add(clean);
+        if(clean.startsWith("http://"))out.add("https://"+clean.substring(7));
+        else if(clean.startsWith("https://"))out.add("http://"+clean.substring(8));
     }
     private void showHome(){
         String s=prefs.getString("server",""); api=new XtreamApi(serverCandidates(s),prefs.getString("working_server",s),prefs.getString("user",""),prefs.getString("pass",""));
