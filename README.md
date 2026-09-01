@@ -1,4 +1,4 @@
-# Cyber IPTV 0.2 – Android / Fire TV
+# Cyber IPTV 0.2.1 – Android / Fire TV
 
 Erste private MVP-Version eines reinen IPTV-Players. Die App enthält keine Sender und keinen Zugang. Sie funktioniert ausschließlich mit rechtmäßig bereitgestellten Xtream-Codes-Zugangsdaten.
 
@@ -8,6 +8,8 @@ Erste private MVP-Version eines reinen IPTV-Players. Die App enthält keine Send
 - Der zuletzt funktionierende Server wird bevorzugt und dauerhaft gemerkt
 - Automatischer API-Failover mit kurzen Verbindungszeiten statt minutenlangem Warten
 - Automatischer Stream-Failover im Player, wenn die Wiedergabe abbricht
+- Prüft HTTP- und HTTPS-Varianten automatisch
+- Erkennt HTML-/Parkseiten und überspringt sie statt mit einem JSON-Fehler abzubrechen
 - Acht bereitgestellte Server-/Backup-URLs bleiben zusätzlich direkt auswählbar
 - Live-TV mit Media3/ExoPlayer und HLS
 - Filme
