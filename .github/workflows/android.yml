@@ -25,7 +25,15 @@ jobs:
           printf '{}' > app/src/main/assets/private_config.json
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+      - name: Collect signing tools
+        run: |
+          mkdir -p signing-tools/lib
+          cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" signing-tools/
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" signing-tools/
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" signing-tools/lib/
       - uses: actions/upload-artifact@v4
         with:
-          name: CyberIPTV-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: CyberIPTV-build
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            signing-tools/
